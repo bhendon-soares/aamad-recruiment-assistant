@@ -37,9 +37,9 @@ class ApplicationCrew:
         inputs = request.model_dump()
         try:
             output = self._run_crewai_task("extract_role_rubric", inputs)
-            return parse_json_model(output, RoleRubric)
-        except RuntimeError:
+        except Exception:
             return self._fallback_role_rubric(request)
+        return parse_json_model(output, RoleRubric)
 
     def generate_candidate_packet(self, request: CandidatePacketRequest) -> CandidatePacketResponse:
         if request.role_rubric.status != "approved":
@@ -48,7 +48,7 @@ class ApplicationCrew:
         run_id = str(uuid4())
         try:
             profile, fit, compliance, interview_kit, report = self._run_candidate_packet_crew(request)
-        except RuntimeError:
+        except Exception:
             profile, fit, compliance, interview_kit, report = self._fallback_candidate_packet(request)
 
         assert_no_final_decision_language(report.model_dump())
@@ -180,6 +180,7 @@ class ApplicationCrew:
             for index, line in enumerate(_significant_lines(combined_text), start=1)
         ][:8]
         profile = CandidateProfile(
+            candidate_id=request.candidate_id or str(uuid4()),
             source_documents=source_documents,
             skills=_extract_skill_terms(combined_text),
             evidence_snippets=snippets,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.crews.recruitment import ApplicationCrew
 from app.models import CandidatePacketRequest, CandidatePacketResponse, GenerateRubricRequest, RoleRubric
@@ -11,6 +12,14 @@ app = FastAPI(
     title="Recruitment Assistant Backend",
     version="0.1.0",
     description="MVP CrewAI-backed API for role rubrics and candidate packets.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 

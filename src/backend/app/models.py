@@ -137,6 +137,7 @@ class GenerateRubricRequest(BaseModel):
 
 
 class CandidatePacketRequest(BaseModel):
+    candidate_id: str | None = None
     role_rubric: RoleRubric
     source_documents: list[SourceDocument] = Field(min_length=1)
     profile_corrections: list[dict[str, Any]] = Field(default_factory=list)

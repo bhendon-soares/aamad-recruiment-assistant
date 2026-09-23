@@ -5,37 +5,96 @@ import { useState } from "react";
 type PanelId = "role" | "rubric" | "candidate" | "packet" | "compliance" | "report" | "audit" | "admin";
 type FitCategory = "strong_potential_fit" | "potential_fit_with_gaps" | "insufficient_evidence" | "not_aligned_with_current_rubric";
 type Theme = "light" | "dark";
+type CriterionStatus = "met" | "partially_met" | "not_evidenced" | "gap";
+type ComplianceStatus = "passed" | "passed_with_warnings" | "blocked_until_resolved";
 
 type RoleRubric = {
-    roleTitle: string;
+    role_rubric_id: string;
+    role_title: string;
     department: string;
-    mustHave: string[];
-    niceHave: string[];
-    ambiguity: string;
+    must_have_criteria: string[];
+    nice_to_have_criteria: string[];
+    responsibilities: string[];
+    seniority_level: string;
+    location_or_work_authorization_constraints: string[];
+    evaluation_categories: string[];
+    excluded_criteria: string[];
+    ambiguous_requirements: Array<Record<string, unknown>>;
+    clarification_questions: string[];
+    ambiguity_resolution_notes: string[];
+    created_by: string;
+    approved_by: string | null;
+    approved_at: string | null;
+    status: "draft" | "approved";
 };
 
 type Assessment = {
     criterion: string;
-    status: string;
-    evidence: string;
+    status: CriterionStatus;
+    rationale: string;
+    confidence: "low" | "medium" | "high";
+    evidence_references: string[];
+};
+
+type CandidateProfile = {
+    candidate_id: string;
+    source_documents: Array<{ document_id: string; name: string; text: string; source_type: "paste" | "text" | "pdf" | "docx" }>;
+    skills: string[];
+    evidence_snippets: Array<{ source_document_id: string; text: string; reference: string }>;
+    missing_or_unclear_information: string[];
+};
+
+type FitAssessment = {
+    candidate_id: string;
+    role_rubric_id: string;
+    criterion_assessments: Assessment[];
+    strengths: string[];
+    gaps: string[];
+    follow_up_questions: string[];
+    fit_category: FitCategory;
+    confidence_level: "low" | "medium" | "high";
+    evidence_references: string[];
+    generated_at: string;
+};
+
+type ComplianceReview = {
+    unsupported_claims: string[];
+    protected_attribute_warnings: string[];
+    missing_evidence_warnings: string[];
+    overconfidence_warnings: string[];
+    prompt_injection_flags: string[];
+    required_human_actions: string[];
+    review_status: ComplianceStatus;
 };
 
 type CandidatePacket = {
-    candidateId: string;
-    sourceDocument: string;
-    fitCategory: FitCategory;
-    assessments: Assessment[];
-    strengths: string[];
-    gaps: string[];
-    warnings: string[];
-    complianceStatus: "passed_with_warnings";
+    run_id: string;
+    candidate_profile: CandidateProfile;
+    fit_assessment: FitAssessment;
+    compliance_review: ComplianceReview;
+    status: "ready_for_human_review" | "ready_with_warnings" | "blocked_until_resolved";
 };
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 const fitCategoryLabels: Record<FitCategory, string> = {
     strong_potential_fit: "Strong potential fit",
     potential_fit_with_gaps: "Potential fit with gaps",
     insufficient_evidence: "Insufficient evidence",
     not_aligned_with_current_rubric: "Not aligned with current rubric",
+};
+
+const criterionStatusLabels: Record<CriterionStatus, string> = {
+    met: "Met",
+    partially_met: "Partially met",
+    not_evidenced: "Not evidenced",
+    gap: "Gap",
+};
+
+const complianceStatusLabels: Record<ComplianceStatus, string> = {
+    passed: "Passed",
+    passed_with_warnings: "Passed with warnings",
+    blocked_until_resolved: "Blocked until resolved",
 };
 
 const navItems: Array<{ id: PanelId; label: string }> = [
@@ -79,12 +138,21 @@ export default function Home() {
     const [reviewerName, setReviewerName] = useState("");
     const [decisionNote, setDecisionNote] = useState("");
     const [toast, setToast] = useState("");
+    const [isBusy, setIsBusy] = useState(false);
     const [audit, setAudit] = useState(["Frontend loaded with local-only MVP workflow."]);
 
     const rubricStatus = rubricApproved ? { label: "Rubric approved", tone: "ready" as const } : { label: "Rubric draft", tone: "draft" as const };
-    const packetStatus = packet ? { label: "Ready with warnings", tone: "warning" as const } : { label: "Packet waiting", tone: "waiting" as const };
+    const packetStatus = packet ? { label: packet.status === "ready_with_warnings" ? "Ready with warnings" : packet.status === "blocked_until_resolved" ? "Blocked" : "Ready for review", tone: packet.status === "blocked_until_resolved" ? "blocked" as const : packet.status === "ready_with_warnings" ? "warning" as const : "ready" as const } : { label: "Packet waiting", tone: "waiting" as const };
     const exportEnabled = Boolean(packet && warningAcknowledged && reviewerName.trim() && decisionNote.trim());
     const isDarkTheme = theme === "dark";
+    const complianceWarnings = packet ? [
+        ...packet.compliance_review.unsupported_claims,
+        ...packet.compliance_review.protected_attribute_warnings,
+        ...packet.compliance_review.missing_evidence_warnings,
+        ...packet.compliance_review.overconfidence_warnings,
+        ...packet.compliance_review.prompt_injection_flags,
+        ...packet.compliance_review.required_human_actions,
+    ] : [];
 
     function showToast(message: string) {
         setToast(message);
@@ -95,28 +163,47 @@ export default function Home() {
         setAudit((items) => [`${timestamp()} - ${message}`, ...items]);
     }
 
-    function generateRubric() {
-        const nextRubric: RoleRubric = {
-            roleTitle: roleTitle.trim() || "Untitled role",
-            department: department.trim() || "Unassigned",
-            mustHave: [
-                "Interaction design for complex workflow products",
-                "Research synthesis with source-backed recommendations",
-                "Accessible design practice",
-                "Cross-functional partnership with product and engineering",
-            ],
-            niceHave: ["Hiring systems domain exposure", "AI-assisted product experience", "Design systems stewardship"],
-            ambiguity: "Seniority evidence and hiring-systems depth need recruiter confirmation before assessment.",
-        };
+    async function postJson<ResponseBody>(path: string, body: unknown): Promise<ResponseBody> {
+        const response = await fetch(`${apiBaseUrl}${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
 
-        setRubric(nextRubric);
-        setRubricApproved(false);
-        setPacket(null);
-        setAmbiguityResolved(false);
-        setWarningAcknowledged(false);
-        addAudit(`Draft rubric generated for ${nextRubric.roleTitle} in ${nextRubric.department}.`);
-        showToast("Rubric draft generated. Resolve ambiguity before approval.");
-        setActivePanel("rubric");
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => null) as { detail?: string } | null;
+            throw new Error(errorBody?.detail ?? `API request failed with status ${response.status}`);
+        }
+
+        return response.json() as Promise<ResponseBody>;
+    }
+
+    async function generateRubric() {
+        setIsBusy(true);
+        try {
+            const nextRubric = await postJson<RoleRubric>("/api/rubrics/generate", {
+                role_title: roleTitle.trim() || "Untitled role",
+                department: department.trim() || "Unassigned",
+                job_description: jobDescription,
+                recruiter_notes: notes,
+                created_by: reviewerName.trim() || "local_recruiter",
+            });
+
+            setRubric(nextRubric);
+            setRubricApproved(false);
+            setPacket(null);
+            setAmbiguityResolved(false);
+            setWarningAcknowledged(false);
+            addAudit(`Draft rubric generated through API for ${nextRubric.role_title} in ${nextRubric.department}.`);
+            showToast("Rubric draft generated by backend API.");
+            setActivePanel("rubric");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to generate rubric.";
+            addAudit(`Rubric generation failed: ${message}`);
+            showToast(message);
+        } finally {
+            setIsBusy(false);
+        }
     }
 
     function approveRubric() {
@@ -131,58 +218,54 @@ export default function Home() {
             return;
         }
 
+        const approvedRubric: RoleRubric = {
+            ...rubric,
+            status: "approved",
+            approved_by: reviewerName.trim() || "local_recruiter",
+            approved_at: new Date().toISOString(),
+            ambiguity_resolution_notes: rubric.ambiguity_resolution_notes.length ? rubric.ambiguity_resolution_notes : ["Human reviewer resolved or waived ambiguity for MVP assessment."],
+        };
+
+        setRubric(approvedRubric);
         setRubricApproved(true);
         addAudit("Rubric approved by human reviewer; candidate assessment enabled.");
         showToast("Rubric approved. Candidate packet generation is now available.");
         setActivePanel("candidate");
     }
 
-    function generatePacket() {
+    async function generatePacket() {
         if (!rubricApproved || !rubric) {
             showToast("Approve the rubric before candidate assessment.");
             return;
         }
 
-        const nextPacket: CandidatePacket = {
-            candidateId: candidateId.trim() || "CAND-DRAFT",
-            sourceDocument: sourceDocument.trim() || "manual-paste.txt",
-            fitCategory: "potential_fit_with_gaps",
-            assessments: [
-                {
-                    criterion: "Interaction design for complex workflow products",
-                    status: "supported",
-                    evidence: "Led redesign of enterprise workflow tools.",
-                },
-                {
-                    criterion: "Research synthesis with source-backed recommendations",
-                    status: "partial evidence",
-                    evidence: "Partnered with research; explicit synthesis artifacts not provided.",
-                },
-                {
-                    criterion: "Accessible design practice",
-                    status: "supported",
-                    evidence: "Introduced accessibility review practices.",
-                },
-                {
-                    criterion: "Cross-functional partnership with product and engineering",
-                    status: "supported",
-                    evidence: "Partnered with research, engineering, and product leads.",
-                },
-            ],
-            strengths: ["Workflow product experience", "Accessibility practice", "Cross-functional delivery"],
-            gaps: ["Ask for concrete research synthesis examples", "Confirm seniority scope and mentoring evidence"],
-            warnings: [
-                "One assessment uses partial evidence and needs human review.",
-                "No protected-attribute inference detected in this local demo packet.",
-                "Candidate source text is treated as untrusted input.",
-            ],
-            complianceStatus: "passed_with_warnings",
-        };
+        setIsBusy(true);
+        try {
+            const nextPacket = await postJson<CandidatePacket>("/api/candidate-packets", {
+                candidate_id: candidateId.trim() || "CAND-DRAFT",
+                role_rubric: rubric,
+                source_documents: [
+                    {
+                        name: sourceDocument.trim() || "manual-paste.txt",
+                        text: candidateText,
+                        source_type: "paste",
+                    },
+                ],
+                profile_corrections: [],
+            });
 
-        setPacket(nextPacket);
-        addAudit(`Candidate packet generated for ${nextPacket.candidateId} from ${nextPacket.sourceDocument}.`);
-        showToast("Candidate packet generated with review warnings.");
-        setActivePanel("packet");
+            setPacket(nextPacket);
+            setWarningAcknowledged(false);
+            addAudit(`Candidate packet generated through API for ${nextPacket.candidate_profile.candidate_id}; run ${nextPacket.run_id}.`);
+            showToast("Candidate packet generated by backend API.");
+            setActivePanel("packet");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to generate candidate packet.";
+            addAudit(`Candidate packet generation failed: ${message}`);
+            showToast(message);
+        } finally {
+            setIsBusy(false);
+        }
     }
 
     function exportReport() {
@@ -196,7 +279,7 @@ export default function Home() {
     }
 
     const reportPreview = packet
-        ? `# Candidate Report: ${packet.candidateId}\n\nRole: ${rubric?.roleTitle ?? "Pending role"}\nFit category: ${fitCategoryLabels[packet.fitCategory]}\nCompliance status: Passed with warnings\nHuman reviewer: ${reviewerName.trim() || "Pending reviewer"}\n\nSummary:\nThe candidate has evidence of workflow product design, accessibility practice, and cross-functional delivery. Research synthesis and seniority scope require human follow-up.\n\nHuman decision note:\n${decisionNote.trim() || "Pending human decision note."}`
+        ? `# Candidate Report: ${packet.candidate_profile.candidate_id}\n\nRole: ${rubric?.role_title ?? "Pending role"}\nFit category: ${fitCategoryLabels[packet.fit_assessment.fit_category]}\nCompliance status: ${complianceStatusLabels[packet.compliance_review.review_status]}\nHuman reviewer: ${reviewerName.trim() || "Pending reviewer"}\nRun ID: ${packet.run_id}\n\nSummary:\n${packet.candidate_profile.evidence_snippets[0]?.text ?? "Draft candidate packet generated for human review."}\n\nHuman decision note:\n${decisionNote.trim() || "Pending human decision note."}`
         : "Candidate report will appear after packet generation.";
 
     return (
@@ -243,7 +326,7 @@ export default function Home() {
                                     <p className="eyebrow">Role intake</p>
                                     <h2 id="roleTitleHeading">Create a role</h2>
                                 </div>
-                                <button className="primary-action" onClick={generateRubric} type="button">Generate rubric</button>
+                                <button className="primary-action" disabled={isBusy} onClick={generateRubric} type="button">{isBusy ? "Working..." : "Generate rubric"}</button>
                             </div>
 
                             <div className="form-grid">
@@ -281,18 +364,22 @@ export default function Home() {
                                 <article className="review-card">
                                     <h3>Must-have criteria</h3>
                                     <ul className="editable-list">
-                                        {(rubric?.mustHave ?? []).map((item) => <li key={item}>{item}</li>)}
+                                        {(rubric?.must_have_criteria ?? []).map((item) => <li key={item}>{item}</li>)}
                                     </ul>
                                 </article>
                                 <article className="review-card">
                                     <h3>Nice-to-have criteria</h3>
                                     <ul className="editable-list">
-                                        {(rubric?.niceHave ?? []).map((item) => <li key={item}>{item}</li>)}
+                                        {(rubric?.nice_to_have_criteria ?? []).map((item) => <li key={item}>{item}</li>)}
                                     </ul>
                                 </article>
                                 <article className="review-card full-width">
                                     <h3>Ambiguity resolution</h3>
-                                    <div className="warning-box">{rubric?.ambiguity ?? "Generate a rubric to review ambiguity warnings."}</div>
+                                    <div className="warning-box">
+                                        {rubric?.ambiguous_requirements.length
+                                            ? rubric.ambiguous_requirements.map((item) => JSON.stringify(item)).join("; ")
+                                            : "No backend ambiguity warnings returned for this draft."}
+                                    </div>
                                     <label className="checkbox-row">
                                         <input checked={ambiguityResolved} onChange={(event) => setAmbiguityResolved(event.target.checked)} type="checkbox" />
                                         High-severity ambiguity has been resolved or waived with rationale
@@ -309,7 +396,7 @@ export default function Home() {
                                     <p className="eyebrow">Candidate queue</p>
                                     <h2 id="candidateTitleHeading">Add candidate material</h2>
                                 </div>
-                                <button className="primary-action" disabled={!rubricApproved} onClick={generatePacket} type="button">Generate packet</button>
+                                <button className="primary-action" disabled={!rubricApproved || isBusy} onClick={generatePacket} type="button">{isBusy ? "Working..." : "Generate packet"}</button>
                             </div>
 
                             <div className="form-grid">
@@ -342,7 +429,7 @@ export default function Home() {
                                     <p className="eyebrow">Candidate packet</p>
                                     <h2 id="packetTitleHeading">Criterion assessment</h2>
                                 </div>
-                                <StatusPill label={packet ? fitCategoryLabels[packet.fitCategory] : "Waiting for candidate"} tone={packet ? "warning" : "waiting"} />
+                                <StatusPill label={packet ? fitCategoryLabels[packet.fit_assessment.fit_category] : "Waiting for candidate"} tone={packet ? "warning" : "waiting"} />
                             </div>
 
                             <div className="table-wrap">
@@ -356,11 +443,11 @@ export default function Home() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {packet ? packet.assessments.map((assessment) => (
+                                        {packet ? packet.fit_assessment.criterion_assessments.map((assessment) => (
                                             <tr key={assessment.criterion}>
                                                 <td>{assessment.criterion}</td>
-                                                <td><StatusPill label={assessment.status} tone="ready" /></td>
-                                                <td>{assessment.evidence}</td>
+                                                <td><StatusPill label={criterionStatusLabels[assessment.status]} tone="ready" /></td>
+                                                <td>{assessment.evidence_references.join(", ") || assessment.rationale}</td>
                                                 <td><input aria-label={`Human note for ${assessment.criterion}`} placeholder="Add note" type="text" /></td>
                                             </tr>
                                         )) : (
@@ -373,11 +460,11 @@ export default function Home() {
                             <div className="split-layout compact-gap">
                                 <article className="review-card">
                                     <h3>Strengths</h3>
-                                    <ul>{(packet?.strengths ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
+                                    <ul>{(packet?.fit_assessment.strengths ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
                                 </article>
                                 <article className="review-card">
                                     <h3>Gaps and follow-up</h3>
-                                    <ul>{(packet?.gaps ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
+                                    <ul>{(packet ? [...packet.fit_assessment.gaps, ...packet.fit_assessment.follow_up_questions] : []).map((item) => <li key={item}>{item}</li>)}</ul>
                                 </article>
                             </div>
                         </section>
@@ -390,11 +477,11 @@ export default function Home() {
                                     <p className="eyebrow">Compliance review</p>
                                     <h2 id="complianceTitleHeading">Warnings and required actions</h2>
                                 </div>
-                                <StatusPill label={packet ? "Passed with warnings" : "Not reviewed"} tone={packet ? "warning" : "waiting"} />
+                                <StatusPill label={packet ? complianceStatusLabels[packet.compliance_review.review_status] : "Not reviewed"} tone={packet ? "warning" : "waiting"} />
                             </div>
 
                             <div className="warning-grid">
-                                {packet ? packet.warnings.map((warning) => <article className="warning-box" key={warning}>{warning}</article>) : <article className="warning-box">Generate a packet to populate compliance review.</article>}
+                                {packet ? complianceWarnings.map((warning) => <article className="warning-box" key={warning}>{warning}</article>) : <article className="warning-box">Generate a packet to populate compliance review.</article>}
                             </div>
                             <label className="checkbox-row">
                                 <input checked={warningAcknowledged} onChange={(event) => setWarningAcknowledged(event.target.checked)} type="checkbox" />
