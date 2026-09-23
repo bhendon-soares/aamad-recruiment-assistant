@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recruitment Assistant</title>
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+    <header class="app-header">
+        <div>
+            <p class="eyebrow">Recruitment Assistant</p>
+            <h1>Evidence-linked candidate review</h1>
+        </div>
+        <div class="header-status" aria-label="Workflow status">
+            <span class="status-pill status-draft" id="rubricStatus">Rubric draft</span>
+            <span class="status-pill status-waiting" id="packetStatus">Packet waiting</span>
+        </div>
+    </header>
+
+    <main class="workspace-shell">
+        <nav class="sidebar" aria-label="Recruitment workflow">
+            <button class="nav-item active" data-panel="rolePanel" type="button">Role</button>
+            <button class="nav-item" data-panel="rubricPanel" type="button">Rubric</button>
+            <button class="nav-item" data-panel="candidatePanel" type="button">Candidates</button>
+            <button class="nav-item" data-panel="packetPanel" type="button">Packet</button>
+            <button class="nav-item" data-panel="compliancePanel" type="button">Compliance</button>
+            <button class="nav-item" data-panel="reportPanel" type="button">Report</button>
+            <button class="nav-item" data-panel="auditPanel" type="button">Audit</button>
+            <button class="nav-item" data-panel="adminPanel" type="button">Admin</button>
+        </nav>
+
+        <section class="content-surface" aria-live="polite">
+            <section class="panel active" id="rolePanel" aria-labelledby="roleTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Role intake</p>
+                        <h2 id="roleTitle">Create a role</h2>
+                    </div>
+                    <button class="primary-action" id="generateRubric" type="button">Generate rubric</button>
+                </div>
+
+                <div class="form-grid">
+                    <label>
+                        Role title
+                        <input id="roleTitleInput" type="text" value="Senior Product Designer" />
+                    </label>
+                    <label>
+                        Department
+                        <input id="departmentInput" type="text" value="Product" />
+                    </label>
+                    <label>
+                        Recruiter notes
+                        <input id="notesInput" type="text"
+                            value="Prioritize complex workflow design and evidence of cross-functional leadership." />
+                    </label>
+                    <label class="full-width">
+                        Job description
+                        <textarea id="jobDescription"
+                            rows="9">We need a senior product designer for a complex B2B workflow product. Must have strong interaction design, research synthesis, accessible design practice, and experience partnering with engineering and product leads. Nice to have: hiring systems, AI-assisted products, and design systems. The role is remote-friendly in US time zones.</textarea>
+                    </label>
+                </div>
+            </section>
+
+            <section class="panel" id="rubricPanel" aria-labelledby="rubricTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Rubric editor</p>
+                        <h2 id="rubricTitle">Review generated criteria</h2>
+                    </div>
+                    <button class="primary-action" id="approveRubric" type="button">Approve rubric</button>
+                </div>
+
+                <div class="split-layout">
+                    <article class="review-card">
+                        <h3>Must-have criteria</h3>
+                        <ul class="editable-list" id="mustHaveList"></ul>
+                    </article>
+                    <article class="review-card">
+                        <h3>Nice-to-have criteria</h3>
+                        <ul class="editable-list" id="niceHaveList"></ul>
+                    </article>
+                    <article class="review-card full-width">
+                        <h3>Ambiguity resolution</h3>
+                        <div class="warning-box" id="ambiguityBox">
+                            Generate a rubric to review ambiguity warnings.
+                        </div>
+                        <label class="checkbox-row">
+                            <input id="ambiguityResolved" type="checkbox" />
+                            High-severity ambiguity has been resolved or waived with rationale
+                        </label>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel" id="candidatePanel" aria-labelledby="candidateTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Candidate queue</p>
+                        <h2 id="candidateTitle">Add candidate material</h2>
+                    </div>
+                    <button class="primary-action" id="generatePacket" type="button" disabled>Generate packet</button>
+                </div>
+
+                <div class="form-grid">
+                    <label>
+                        Candidate ID
+                        <input id="candidateId" type="text" value="CAND-1042" />
+                    </label>
+                    <label>
+                        Source document
+                        <input id="sourceDocument" type="text" value="resume-paste.txt" />
+                    </label>
+                    <label class="full-width">
+                        Candidate profile text
+                        <textarea id="candidateText" rows="10"
+                            disabled>Led redesign of enterprise workflow tools, partnered with research and engineering, introduced accessibility review practices, and maintained a component library. Recent work includes AI-assisted applicant tracking experiments.</textarea>
+                    </label>
+                </div>
+
+                <div class="stub-row" aria-label="Future ingestion stubs">
+                    <button class="ghost-action" type="button" disabled>Upload PDF/DOCX</button>
+                    <button class="ghost-action" type="button" disabled>ATS import</button>
+                    <button class="ghost-action" type="button" disabled>Authorized profile import</button>
+                </div>
+            </section>
+
+            <section class="panel" id="packetPanel" aria-labelledby="packetTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Candidate packet</p>
+                        <h2 id="packetTitle">Criterion assessment</h2>
+                    </div>
+                    <span class="status-pill status-waiting" id="fitCategory">Waiting for candidate</span>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Criterion</th>
+                                <th>Status</th>
+                                <th>Evidence</th>
+                                <th>Human note</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assessmentRows">
+                            <tr>
+                                <td colspan="4">Approve a rubric and generate a candidate packet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="split-layout compact-gap">
+                    <article class="review-card">
+                        <h3>Strengths</h3>
+                        <ul id="strengthsList"></ul>
+                    </article>
+                    <article class="review-card">
+                        <h3>Gaps and follow-up</h3>
+                        <ul id="gapsList"></ul>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel" id="compliancePanel" aria-labelledby="complianceTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Compliance review</p>
+                        <h2 id="complianceTitle">Warnings and required actions</h2>
+                    </div>
+                    <span class="status-pill status-waiting" id="complianceStatus">Not reviewed</span>
+                </div>
+
+                <div class="warning-grid" id="warningGrid">
+                    <article class="warning-box">Generate a packet to populate compliance review.</article>
+                </div>
+                <label class="checkbox-row">
+                    <input id="warningAcknowledged" type="checkbox" />
+                    Required warnings reviewed by a human
+                </label>
+            </section>
+
+            <section class="panel" id="reportPanel" aria-labelledby="reportTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Report preview</p>
+                        <h2 id="reportTitle">Human review and export</h2>
+                    </div>
+                    <button class="primary-action" id="exportReport" type="button" disabled>Export Markdown</button>
+                </div>
+
+                <div class="form-grid">
+                    <label>
+                        Human reviewer
+                        <input id="reviewerName" type="text" placeholder="Reviewer name" />
+                    </label>
+                    <label class="full-width">
+                        Human decision note
+                        <textarea id="decisionNote" rows="4"
+                            placeholder="Document the human-reviewed next step without final AI decision labels."></textarea>
+                    </label>
+                </div>
+
+                <article class="report-preview" id="reportPreview">
+                    Candidate report will appear after packet generation.
+                </article>
+            </section>
+
+            <section class="panel" id="auditPanel" aria-labelledby="auditTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Audit timeline</p>
+                        <h2 id="auditTitle">Traceable workflow events</h2>
+                    </div>
+                </div>
+                <ol class="timeline" id="auditTimeline"></ol>
+            </section>
+
+            <section class="panel" id="adminPanel" aria-labelledby="adminTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Admin stubs</p>
+                        <h2 id="adminTitle">Governance controls</h2>
+                    </div>
+                </div>
+                <div class="stub-grid">
+                    <button class="ghost-action" type="button" disabled>Retention policy</button>
+                    <button class="ghost-action" type="button" disabled>Deletion request</button>
+                    <button class="ghost-action" type="button" disabled>Model provider settings</button>
+                    <button class="ghost-action" type="button" disabled>Adverse-impact analytics</button>
+                    <button class="ghost-action" type="button" disabled>Candidate disclosure workflow</button>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+</body>
+
+</html>
