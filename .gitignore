@@ -217,3 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Node / Next.js frontend
+src/frontend/node_modules/
+src/frontend/.next/
+src/frontend/out/
+src/frontend/.env*.local
+
