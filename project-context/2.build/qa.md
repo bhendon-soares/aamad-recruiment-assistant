@@ -83,3 +83,35 @@ Browser smoke was run against temporary local servers and both servers were stop
 MVP smoke status: Passed with caveats.
 
 The implemented recruitment assistant supports the current happy path from role intake through human-approved rubric and candidate packet generation. Decision-support guardrails and approval gating are present for the tested slice. The main release risks are operational rather than flow-breaking: interactive CrewAI trace prompts, fallback-only LLM behavior without valid provider configuration, and lack of automated regression tests.
+
+## Sources
+
+- `project-context/1.define/prd.md`
+- `project-context/1.define/sad.md`
+- `project-context/2.build/frontend.md`
+- `project-context/2.build/backend.md`
+- `project-context/2.build/integration.md`
+- `src/backend/app/main.py`
+- `src/frontend/src/app/page.tsx`
+
+## Assumptions
+
+- MVP acceptance is scoped to the implemented pasted-text candidate flow.
+- Provider-backed CrewAI output quality is not fully certified until model credentials are configured in a controlled environment.
+- npm/Node patch-level warnings do not block this Build phase because lint and production build passed.
+
+## Open Questions
+
+- Which CI runner should execute the backend, frontend, and smoke checks before Deliver phase?
+- Which non-interactive CrewAI trace setting should be standardized for local and CI runs?
+- What minimum automated regression suite is required before pilot deployment?
+
+## Audit
+
+| Item | Value |
+|---|---|
+| AAMAD_TARGET_RUNTIME=crewai | Confirmed selected runtime for Build phase |
+| QA date | 2026-09-23 |
+| Backend checks | Compile, validation behavior, API round trip |
+| Frontend checks | Lint, production build, browser smoke |
+| Verdict | Passed with caveats |

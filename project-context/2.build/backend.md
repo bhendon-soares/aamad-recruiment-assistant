@@ -148,10 +148,36 @@ These remain follow-up build tasks for Project Manager, Integration Engineer, QA
 
 ---
 
+## Sources
+
+- `project-context/1.define/prd.md`
+- `project-context/1.define/sad.md`
+- `.github/instructions/adapter-crewai.instructions.md`
+- `.cursor/rules/adapter-crewai.mdc`
+- `src/backend/app/main.py`
+- `src/backend/app/models.py`
+- `src/backend/app/guardrails.py`
+- `src/backend/app/crews/recruitment/crew.py`
+
+## Assumptions
+
+- The Build-phase backend is an MVP API and does not include persistent storage, authentication, or async job infrastructure.
+- CrewAI/model-provider credentials may be absent in local development, so fallback artifacts support smoke validation.
+- Candidate materials are treated as untrusted input and must not override system or task instructions.
+
+## Open Questions
+
+- Which provider credentials and model policy should be approved for non-fallback CrewAI validation?
+- Which database and object storage targets should back persistent audit packages in the next build slice?
+- Should async job execution be introduced before or after document upload parsing?
+
+---
+
 ## Audit
 
 | Item | Value |
 |---|---|
+| AAMAD_TARGET_RUNTIME=crewai | Confirmed selected runtime for Build phase |
 | Resolved `AAMAD_TARGET_RUNTIME` | `crewai` |
 | Adapter followed | `adapter-crewai` |
 | Backend framework | FastAPI |

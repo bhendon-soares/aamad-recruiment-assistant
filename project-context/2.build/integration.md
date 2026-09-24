@@ -115,3 +115,34 @@ Known environment warning: `corepack npm` reports that npm 12.1.0 prefers Node.j
 - The frontend currently supports pasted candidate text only. PDF/DOCX upload controls remain disabled stubs.
 - Export remains a frontend gate and preview only; no backend Markdown/PDF export endpoint is implemented yet.
 - Authentication, persistent audit storage, retention/deletion workflows, and role-based access controls are still deferred.
+
+## Sources
+
+- `project-context/1.define/prd.md`
+- `project-context/1.define/sad.md`
+- `project-context/2.build/frontend.md`
+- `project-context/2.build/backend.md`
+- `src/backend/app/main.py`
+- `src/frontend/src/app/page.tsx`
+
+## Assumptions
+
+- Frontend and backend run as separate local services during Build validation.
+- The MVP uses final JSON API responses rather than streaming events.
+- Local fallback artifacts are acceptable for smoke testing when provider credentials are unavailable.
+
+## Open Questions
+
+- What is the target async queue implementation for `/api/agent-runs/{run_id}`?
+- Should report export move to a backend endpoint before Deliver phase packaging?
+- Which CORS origins should be allowed in the first deployed environment?
+
+## Audit
+
+| Item | Value |
+|---|---|
+| AAMAD_TARGET_RUNTIME=crewai | Confirmed selected runtime for Build phase |
+| Frontend service | Next.js on `http://127.0.0.1:3000` |
+| Backend service | FastAPI on `http://127.0.0.1:8000` |
+| Core endpoints | `GET /api/health`, `POST /api/rubrics/generate`, `POST /api/candidate-packets` |
+| Streaming | Not implemented for MVP |

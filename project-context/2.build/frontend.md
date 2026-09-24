@@ -101,6 +101,38 @@ Recommended local smoke test:
 
 ---
 
+## Sources
+
+- `project-context/1.define/prd.md`
+- `project-context/1.define/sad.md`
+- `src/frontend/src/app/page.tsx`
+- `src/frontend/src/app/globals.css`
+- `src/frontend/package.json`
+
+## Assumptions
+
+- The MVP frontend runs as a local Next.js application during Build validation.
+- The backend API base URL defaults to `http://127.0.0.1:8000` unless `NEXT_PUBLIC_API_BASE_URL` is set.
+- Upload, ATS import, persistence, authentication, and production export features remain deferred.
+
+## Open Questions
+
+- Which production identity provider will supply reviewer identity and role-based access controls?
+- Which document extraction stack should be used for PDF/DOCX ingestion in a later build slice?
+- Which export format should be prioritized first after the MVP preview gate: Markdown, PDF, or both?
+
+## Audit
+
+| Item | Value |
+|---|---|
+| AAMAD_TARGET_RUNTIME=crewai | Confirmed selected runtime for Build phase |
+| Frontend framework | Next.js App Router with TypeScript |
+| API integration | FastAPI via `NEXT_PUBLIC_API_BASE_URL` |
+| Human gates | Rubric approval, warning acknowledgement, reviewer identity, decision note |
+| Deferred controls | Upload, ATS import, authorized profile import, admin settings, analytics |
+
+---
+
 ## Validation
 
 - VS Code diagnostics reported no errors for `src/frontend` after migration.
